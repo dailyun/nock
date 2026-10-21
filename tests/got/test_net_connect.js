@@ -80,6 +80,34 @@ describe('`enableNetConnect()`', () => {
     )
   })
 
+  for (const flag of ['g', 'y']) {
+    it(`checks each connection independently with a ${flag} regexp`, async () => {
+      const onResponse = sinon.spy()
+      const { origin } = await servers.startHttpServer((request, response) => {
+        onResponse()
+        response.end('allowed')
+      })
+
+      nock.enableNetConnect(new RegExp('^localhost:', flag))
+
+      expect(await got(origin).text()).to.equal('allowed')
+      expect(await got(origin).text()).to.equal('allowed')
+      await assertRejects(
+        got('http://example.test/'),
+        /Nock: Disallowed net connect/,
+      )
+      expect(await got(origin).text()).to.equal('allowed')
+      expect(onResponse).to.have.been.calledThrice()
+    })
+  }
+
+  it('supports a frozen regexp without stateful flags', async () => {
+    const { origin } = await servers.startHttpServer()
+    nock.enableNetConnect(Object.freeze(/^localhost:/))
+
+    expect((await got(origin)).statusCode).to.equal(200)
+  })
+
   it('enables real HTTP request only for specified domain, via function', async () => {
     const onResponse = sinon.spy()
     const { origin } = await servers.startHttpServer((request, response) => {
